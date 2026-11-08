@@ -25,7 +25,9 @@
 4. No se activa `logfile` (Unbound escribe al journal) para no depender de AppArmor.
 5. Se añade `net.core.wmem_max=4194304` al sysctl de la guía, por el `so-sndbuf` por defecto de Unbound 1.2x
    (ver la [documentación de unbound.conf](https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html)).
-6. Los pasos se ajustaron a Pi-hole v6 (`pihole-FTL --config`), que la guía no trata.
+6. Se añade `incoming-num-tcp: 100`, que la guía no trae, para evitar los cortes de conexiones TCP
+   que Pi-hole muestra como `CONNECTION_ERROR` (ver README).
+7. Los pasos se ajustaron a Pi-hole v6 (`pihole-FTL --config`), que la guía no trata.
 
 ## Software que el instalador usa (no se redistribuye)
 

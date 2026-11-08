@@ -99,6 +99,35 @@ net.core.rmem_max=1048576
 net.core.wmem_max=4194304
 ```
 
+### `CONNECTION_ERROR ... Connection prematurely closed by remote server`
+
+Aparece en **Pi-hole → Diagnosis** con el upstream `127.0.0.1#5335`:
+
+```
+Connection error (127.0.0.1#5335): TCP connection failed while receiving payload length
+from upstream (Connection prematurely closed by remote server)
+```
+
+En `/var/log/pihole/pihole.log` se ve como una ráfaga de consultas TCP del mismo cliente (cada
+`dnsmasq[PID]` distinto es una conexión TCP) seguida de `TCP connection failed`.
+
+**Causa:** Unbound acepta por defecto `incoming-num-tcp: 10` conexiones TCP entrantes por hilo. Según
+la documentación de `tcp-idle-timeout` en
+[unbound.conf(5)](https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html), cuando
+quedan libres menos del 50 % de esas conexiones, el tiempo de espera baja al 1 %; por debajo del 35 % baja
+al 0,2 %, y por debajo del 20 % llega a 0. Con 6 a 8 conexiones TCP a la vez (navegadores y apps lo hacen),
+si Unbound está resolviendo un nombre que no tiene en caché, cierra la conexión antes de contestar.
+
+**Solución** (incluida en el script):
+
+```
+    incoming-num-tcp: 100
+```
+
+Gasta muy poca memoria (en las pruebas el RSS no cambió), Unbound ajusta su límite de archivos
+abiertos sin intervención (4096 + 100 + …) y, como escucha solo en `127.0.0.1`, nadie de fuera puede
+ocupar esas conexiones. Probado con 40 consultas TCP simultáneas sin ningún corte.
+
 ### IPv6
 
 Con `do-ip6: yes` y sin salida IPv6 real, Unbound pierde tiempo probando servidores IPv6 que no
@@ -203,7 +232,8 @@ Todo lo que hace el script sale de estas fuentes (consultadas el 2026-11-08):
 | Uso del nombre Pi-hole | [Pi-hole — Trademark rules and brand guidelines](https://pi-hole.net/trademark-rules-and-brand-guidelines/) |
 
 Lo que **no** viene de la guía y se aprendió en pruebas reales: `webserver.serve_all` para la
-redirección, `wmem_max` por el `so-sndbuf` de Unbound 1.2x, no desinstalar `resolvconf` en Debian 13
+redirección, `wmem_max` por el `so-sndbuf` de Unbound 1.2x, `incoming-num-tcp: 100` contra el
+`CONNECTION_ERROR` de conexiones TCP, no desinstalar `resolvconf` en Debian 13
 cloud, la autodetección de IPv6 y la reversión automática de upstreams.
 
 ## Licencia, créditos y marcas

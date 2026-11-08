@@ -208,7 +208,8 @@ instalar_unbound() {
 # Generado por pihole-unbound-installer ($STAMP)
 # Adaptado de https://docs.pi-hole.net/guides/dns/unbound/
 # (c) Pi-hole y colaboradores - CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
-# Cambios: do-ip6 autodetectado, puerto configurable, sin logfile, comentarios propios.
+# Cambios: do-ip6 autodetectado, puerto configurable, sin logfile, incoming-num-tcp 100,
+# comentarios propios.
 # Directivas: https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html
 server:
     # Sin logfile: va al journal (evita tocar AppArmor). Ver README para activarlo.
@@ -231,6 +232,11 @@ server:
     prefetch: yes
     num-threads: 1
     so-rcvbuf: 1m
+    # Con el valor por defecto (10), una ráfaga de consultas TCP deja menos del
+    # 50 % de huecos libres; Unbound baja entonces tcp-idle-timeout a 300 ms / 60 ms / 0
+    # y corta la conexión antes de responder -> Pi-hole: CONNECTION_ERROR
+    # "Connection prematurely closed by remote server". Escucha solo en 127.0.0.1.
+    incoming-num-tcp: 100
 
     # Nunca devolver direcciones privadas para dominios públicos (anti DNS rebinding).
     private-address: 192.168.0.0/16
