@@ -7,6 +7,9 @@ entrando por `http://IP/`, sin tener que escribir `/admin`.
 Sigue la [guía oficial de Pi-hole + Unbound](https://docs.pi-hole.net/guides/dns/unbound/) y le suma
 las correcciones que la guía no trae para **Pi-hole v6** y **Debian 13**.
 
+> Proyecto independiente: **no está afiliado ni aprobado por Pi-hole ni por NLnet Labs**.
+> Fuentes, créditos y licencias en [Fuentes oficiales](#fuentes-oficiales) y [NOTICE.md](NOTICE.md).
+
 ## ⚡ Instalación rápida (one-liner)
 
 En un servidor **Debian 12/13 o Ubuntu** con **Pi-hole v6** ya instalado, como `root`:
@@ -180,6 +183,39 @@ Ejemplo: `FORCE_IPV6=no bash /root/pihole-unbound-install.sh --solo-unbound`
 
 - Debian 13 (trixie), Pi-hole Core v6.5 / Web v6.6.1 / FTL v6.8, Unbound 1.26.2.
 
-## Licencia
+## Fuentes oficiales
 
-MIT — ver [LICENSE](LICENSE).
+Todo lo que hace el script sale de estas fuentes (consultadas el 2026-11-08):
+
+| Tema | Fuente |
+|---|---|
+| Guía Pi-hole + Unbound (configuración base, pruebas previas, DNSSEC, `unbound-resolvconf`, `so-rcvbuf`, log y AppArmor) | [docs.pi-hole.net/guides/dns/unbound](https://docs.pi-hole.net/guides/dns/unbound/) |
+| Opciones de Pi-hole v6 (`webserver.serve_all`, `webserver.paths.webroot`, `dns.upstreams`, `dns.dnssec`) | [docs.pi-hole.net/ftldns/configfile](https://docs.pi-hole.net/ftldns/configfile/) |
+| Instalar Pi-hole | [docs.pi-hole.net/main/basic-install](https://docs.pi-hole.net/main/basic-install/) |
+| Directivas de Unbound (`so-rcvbuf`, `so-sndbuf`, `edns-buffer-size`, `harden-*`, `private-address`, `do-ip6`) | [unbound.conf(5) — NLnet Labs](https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html) |
+| Documentación general de Unbound | [unbound.docs.nlnetlabs.nl](https://unbound.docs.nlnetlabs.nl/en/latest/) |
+| Root servers (`a.root-servers.net` = 198.41.0.4 / 2001:503:ba3e::2:30) | [IANA — Root Servers](https://www.iana.org/domains/root/servers) · [root-servers.org](https://root-servers.org/) |
+| Archivo de root hints | [InterNIC — named.root](https://www.internic.net/domain/named.root) |
+| Paquetes de Debian usados | [unbound](https://packages.debian.org/trixie/unbound) · [dns-root-data](https://packages.debian.org/trixie/dns-root-data) |
+| `edns-buffer-size: 1232` | [DNS Flag Day 2020](https://www.dnsflagday.net/2020/) |
+| Rangos de `private-address` | [RFC 6303](https://www.rfc-editor.org/rfc/rfc6303) · [RFC 5737](https://www.rfc-editor.org/rfc/rfc5737) |
+| Dominios de prueba DNSSEC (`dnssec.works`, `fail01.dnssec.works`) | [dnssec.works](https://dnssec.works/) |
+| Uso del nombre Pi-hole | [Pi-hole — Trademark rules and brand guidelines](https://pi-hole.net/trademark-rules-and-brand-guidelines/) |
+
+Lo que **no** viene de la guía y se aprendió en pruebas reales: `webserver.serve_all` para la
+redirección, `wmem_max` por el `so-sndbuf` de Unbound 1.2x, no desinstalar `resolvconf` en Debian 13
+cloud, la autodetección de IPv6 y la reversión automática de upstreams.
+
+## Licencia, créditos y marcas
+
+- **Código del script:** MIT — ver [LICENSE](LICENSE).
+- **Configuración de Unbound y las secciones de este README adaptadas de la guía de Pi-hole:**
+  [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.es), igual que la obra original
+  ([*unbound — Pi-hole documentation*](https://docs.pi-hole.net/guides/dns/unbound/), © Pi-hole y
+  colaboradores de [pi-hole/docs](https://github.com/pi-hole/docs)). Cambios respecto al original en
+  [NOTICE.md](NOTICE.md).
+- **Pi-hole®** es una marca registrada de Pi-hole; **Unbound** es software de NLnet Labs (BSD-3-Clause).
+  Este proyecto no está afiliado, patrocinado ni aprobado por ninguno de los dos; el nombre se usa solo
+  para indicar compatibilidad, sin fines comerciales y sin el logo.
+- El instalador no redistribuye software de terceros: instala Unbound desde los repositorios oficiales
+  de la distribución.

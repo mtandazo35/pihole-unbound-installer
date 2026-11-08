@@ -13,6 +13,19 @@
 #   UNBOUND_PORT=5335    puerto local de Unbound
 #   SKIP_PRECHECK=1      no probar el acceso a los root servers (NO recomendado)
 #   FORCE_IPV6=yes|no    forzar do-ip6 (por defecto se autodetecta)
+#
+# Licencia: código MIT (ver LICENSE). El bloque de configuración de Unbound es
+# una adaptación de https://docs.pi-hole.net/guides/dns/unbound/
+# (© Pi-hole y colaboradores, CC BY-SA 4.0) y se distribuye bajo CC BY-SA 4.0;
+# cambios descritos en NOTICE.md.
+# Proyecto independiente, no afiliado a Pi-hole ni a NLnet Labs.
+# Pi-hole® es marca registrada de Pi-hole.
+#
+# Fuentes oficiales:
+#   https://docs.pi-hole.net/guides/dns/unbound/          (guía base)
+#   https://docs.pi-hole.net/ftldns/configfile/           (opciones de Pi-hole v6)
+#   https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html
+#   https://www.iana.org/domains/root/servers             (a.root-servers.net)
 
 set -uo pipefail
 
@@ -193,7 +206,10 @@ instalar_unbound() {
 
   cat > "$UNBOUND_CONF" << EOF
 # Generado por pihole-unbound-installer ($STAMP)
-# Basado en https://docs.pi-hole.net/guides/dns/unbound/
+# Adaptado de https://docs.pi-hole.net/guides/dns/unbound/
+# (c) Pi-hole y colaboradores - CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
+# Cambios: do-ip6 autodetectado, puerto configurable, sin logfile, comentarios propios.
+# Directivas: https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html
 server:
     # Sin logfile: va al journal (evita tocar AppArmor). Ver README para activarlo.
     verbosity: 0
