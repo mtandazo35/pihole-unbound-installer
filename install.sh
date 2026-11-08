@@ -36,6 +36,7 @@ BACKUP_DIR="/root/backups"
 STATE_DIR="/root/.pihole-unbound-installer"
 UNBOUND_CONF="/etc/unbound/unbound.conf.d/pi-hole.conf"
 SYSCTL_CONF="/etc/sysctl.d/99-unbound.conf"
+GRAVITY_CRON="/etc/cron.d/pihole-gravity-diario"
 WEBROOT="/var/www/html"
 STAMP="$(date +%F-%H%M%S)"
 
@@ -192,6 +193,8 @@ instalar_unbound() {
   # resolver por sí mismo. Se apaga el servicio; NO se desinstala resolvconf
   # (en imágenes cloud de Debian 13 tocar ese paquete con apt puede arrastrar el kernel).
   systemctl disable --now unbound-resolvconf.service >/dev/null 2>&1 || true
+  # Al pararse suele fallar (unbound aún no tiene control socket) y queda en "failed".
+  systemctl reset-failed unbound-resolvconf.service >/dev/null 2>&1 || true
   [ -f /etc/resolvconf.conf ] && sed -Ei 's/^unbound_conf=/#unbound_conf=/' /etc/resolvconf.conf
   rm -f /etc/unbound/unbound.conf.d/resolvconf_resolvers.conf
   ok "unbound-resolvconf desactivado (sin forwarders heredados)."
@@ -204,12 +207,19 @@ instalar_unbound() {
   local ip6; ip6="$(detectar_ipv6)"
   info "IPv6 hacia internet: $ip6 (do-ip6: $ip6)"
 
+  # Hilos = vCPU (1..4). Caché según RAM: con >= 2 GB, 64m/128m; si no, 16m/32m.
+  local hilos mem_mb msgc rrc
+  hilos="$(nproc 2>/dev/null || echo 1)"; [ "$hilos" -gt 4 ] && hilos=4; [ "$hilos" -lt 1 ] && hilos=1
+  mem_mb="$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo)"
+  if [ "${mem_mb:-0}" -ge 1900 ]; then msgc=64m; rrc=128m; else msgc=16m; rrc=32m; fi
+  info "Rendimiento: num-threads $hilos, msg-cache $msgc, rrset-cache $rrc (RAM ${mem_mb} MB)"
+
   cat > "$UNBOUND_CONF" << EOF
 # Generado por pihole-unbound-installer ($STAMP)
 # Adaptado de https://docs.pi-hole.net/guides/dns/unbound/
 # (c) Pi-hole y colaboradores - CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
 # Cambios: do-ip6 autodetectado, puerto configurable, sin logfile, incoming-num-tcp 100,
-# comentarios propios.
+# num-threads y caché según la máquina, serve-expired, comentarios propios.
 # Directivas: https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html
 server:
     # Sin logfile: va al journal (evita tocar AppArmor). Ver README para activarlo.
@@ -230,13 +240,21 @@ server:
     use-caps-for-id: no
     edns-buffer-size: 1232
     prefetch: yes
-    num-threads: 1
+    num-threads: $hilos
     so-rcvbuf: 1m
     # Con el valor por defecto (10), una ráfaga de consultas TCP deja menos del
     # 50 % de huecos libres; Unbound baja entonces tcp-idle-timeout a 300 ms / 60 ms / 0
     # y corta la conexión antes de responder -> Pi-hole: CONNECTION_ERROR
     # "Connection prematurely closed by remote server". Escucha solo en 127.0.0.1.
     incoming-num-tcp: 100
+
+    # Rendimiento: caché más grande y, si un registro caducó, responder con el
+    # guardado mientras se renueva por detrás (RFC 8767, "serve-stale").
+    msg-cache-size: $msgc
+    rrset-cache-size: $rrc
+    serve-expired: yes
+    serve-expired-ttl: 86400
+    serve-expired-client-timeout: 1800
 
     # Nunca devolver direcciones privadas para dominios públicos (anti DNS rebinding).
     private-address: 192.168.0.0/16
@@ -300,6 +318,23 @@ EOF
   if [ "$(ftl_get dns.dnssec)" = "true" ]; then
     info "Nota: dns.dnssec está activo en Pi-hole; con Unbound validando no hace falta (doble validación)."
   fi
+
+  instalar_gravity_diario
+}
+
+# Las listas de Pi-hole se actualizan solo los domingos (/etc/cron.d/pihole).
+# Listas como HaGeZi cambian varias veces al día: se añade una actualización
+# diaria en un archivo propio, que las actualizaciones de Pi-hole no pisan.
+instalar_gravity_diario() {
+  cat > "$GRAVITY_CRON" << 'CRON'
+# Generado por pihole-unbound-installer: actualiza las listas de bloqueo de lunes a sábado
+# (el domingo ya lo hace /etc/cron.d/pihole).
+SHELL=/bin/bash
+PATH=/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/bin
+17 4 * * 1-6 root pihole -g > /var/log/pihole/gravity-diario.log 2>&1
+CRON
+  chmod 644 "$GRAVITY_CRON"
+  ok "Listas: actualización diaria a las 04:17 ($GRAVITY_CRON)."
 }
 
 # ---------------------------------------------------------------- desinstalar
@@ -312,7 +347,7 @@ desinstalar() {
   fi
   ftl_set dns.upstreams "$prev" && ok "Upstreams de Pi-hole: $(ftl_get dns.upstreams)"
   systemctl disable --now unbound >/dev/null 2>&1 && ok "Unbound detenido y deshabilitado."
-  rm -f "$UNBOUND_CONF" "$SYSCTL_CONF"
+  rm -f "$UNBOUND_CONF" "$SYSCTL_CONF" "$GRAVITY_CRON"
   ok "Listo. El paquete unbound sigue instalado: 'apt remove unbound' si quieres quitarlo."
 }
 

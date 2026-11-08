@@ -39,8 +39,10 @@ bash /root/pihole-unbound-install.sh --desinstalar    # volver a los upstreams a
 6. Instala `unbound` + `dns-root-data`, apaga `unbound-resolvconf` y sube los buffers de red.
 7. Escribe `/etc/unbound/unbound.conf.d/pi-hole.conf` (puerto `5335`, solo `127.0.0.1`),
    autodetecta IPv6, valida con `unbound-checkconf` y reinicia.
-8. **Prueba** que resuelve y que DNSSEC rechaza firmas rotas. Solo si todo pasa, apunta Pi-hole a
+8. Ajusta hilos y caché a la máquina (vCPU y RAM) y activa `serve-expired`.
+9. **Prueba** que resuelve y que DNSSEC rechaza firmas rotas. Solo si todo pasa, apunta Pi-hole a
    `127.0.0.1#5335`. Si Pi-hole deja de resolver, **restaura los upstreams anteriores solo**.
+10. Programa la actualización diaria de las listas de bloqueo.
 
 Al final debe verse algo así:
 
@@ -127,6 +129,50 @@ si Unbound está resolviendo un nombre que no tiene en caché, cierra la conexi�
 Gasta muy poca memoria (en las pruebas el RSS no cambió), Unbound ajusta su límite de archivos
 abiertos sin intervención (4096 + 100 + …) y, como escucha solo en `127.0.0.1`, nadie de fuera puede
 ocupar esas conexiones. Probado con 40 consultas TCP simultáneas sin ningún corte.
+
+### Rendimiento: caché, serve-stale e hilos
+
+La guía usa los valores por defecto de caché (4 MB) y un solo hilo. Con un Pi-hole que atiende
+a toda una red, Unbound pasa la mayor parte del tiempo resolviendo desde la raíz (en las pruebas,
+0,25 s de media y más de 1 s en dominios lejanos). El script añade:
+
+```
+    num-threads: <vCPU, de 1 a 4>
+    msg-cache-size: 64m        # 16m si la máquina tiene menos de 2 GB de RAM
+    rrset-cache-size: 128m     # 32m si la máquina tiene menos de 2 GB de RAM
+    serve-expired: yes
+    serve-expired-ttl: 86400
+    serve-expired-client-timeout: 1800
+```
+
+`serve-expired` ([RFC 8767](https://www.rfc-editor.org/rfc/rfc8767)): si un registro caducó, Unbound
+intenta renovarlo durante 1,8 s y, si no lo consigue, responde con el que tenía guardado (como mucho de
+hace 24 h). El usuario no espera y, si un servidor autoritativo se cae, el dominio sigue resolviendo.
+
+### Listas al día
+
+Pi-hole actualiza las listas solo los domingos (`/etc/cron.d/pihole`). Listas como
+[HaGeZi](https://github.com/hagezi/dns-blocklists) cambian varias veces al día, así que el script
+crea `/etc/cron.d/pihole-gravity-diario` (lunes a sábado, 04:17, `pihole -g`). Es un archivo
+propio: las actualizaciones de Pi-hole no lo sobrescriben.
+
+### Bloquear los anuncios dentro de juegos y apps
+
+StevenBlack (la lista por defecto) está pensada sobre todo para la web y deja pasar a las redes de
+anuncios de juegos móviles (Moloco, Mintegral, Pangle, Kidoz, la mediación de Unity, AppsFlyer…).
+Las cubre [HaGeZi Pro](https://github.com/hagezi/dns-blocklists). En **Pi-hole → Lists** añade (formato
+adblock, Pi-hole v6 lo entiende y bloquea también los subdominios):
+
+```
+https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt
+https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/doh.txt   # opcional
+```
+
+La segunda bloquea los servidores de **DNS cifrado** (`dns.google`, `cloudflare-dns.com`,
+`dns.adguard.com`…) con los que móviles y navegadores se saltan el Pi-hole. Si un Android tiene el
+"DNS privado" puesto a mano con uno de ellos, se queda sin internet hasta ponerlo en *Automático*.
+Los juegos con "ver anuncio para obtener recompensa" pueden dejar de dar la recompensa. El script
+**no** añade estas listas: es decisión de cada red.
 
 ### IPv6
 
@@ -227,6 +273,8 @@ Todo lo que hace el script sale de estas fuentes (consultadas el 2026-11-08):
 | Archivo de root hints | [InterNIC — named.root](https://www.internic.net/domain/named.root) |
 | Paquetes de Debian usados | [unbound](https://packages.debian.org/trixie/unbound) · [dns-root-data](https://packages.debian.org/trixie/dns-root-data) |
 | `edns-buffer-size: 1232` | [DNS Flag Day 2020](https://www.dnsflagday.net/2020/) |
+| `serve-expired` (servir datos caducados) | [RFC 8767](https://www.rfc-editor.org/rfc/rfc8767) |
+| Listas de bloqueo HaGeZi | [github.com/hagezi/dns-blocklists](https://github.com/hagezi/dns-blocklists) |
 | Rangos de `private-address` | [RFC 6303](https://www.rfc-editor.org/rfc/rfc6303) · [RFC 5737](https://www.rfc-editor.org/rfc/rfc5737) |
 | Dominios de prueba DNSSEC (`dnssec.works`, `fail01.dnssec.works`) | [dnssec.works](https://dnssec.works/) |
 | Uso del nombre Pi-hole | [Pi-hole — Trademark rules and brand guidelines](https://pi-hole.net/trademark-rules-and-brand-guidelines/) |

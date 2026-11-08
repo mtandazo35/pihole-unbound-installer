@@ -27,7 +27,9 @@
    (ver la [documentación de unbound.conf](https://unbound.docs.nlnetlabs.nl/en/latest/manpages/unbound.conf.html)).
 6. Se añade `incoming-num-tcp: 100`, que la guía no trae, para evitar los cortes de conexiones TCP
    que Pi-hole muestra como `CONNECTION_ERROR` (ver README).
-7. Los pasos se ajustaron a Pi-hole v6 (`pihole-FTL --config`), que la guía no trata.
+7. `num-threads` y caché (`msg-cache-size`, `rrset-cache-size`) se ajustan a la máquina, y se activa
+   `serve-expired` (RFC 8767). La guía usa 1 hilo y los valores por defecto.
+8. Los pasos se ajustaron a Pi-hole v6 (`pihole-FTL --config`), que la guía no trata.
 
 ## Software que el instalador usa (no se redistribuye)
 
